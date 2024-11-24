@@ -1,0 +1,6 @@
+@WB_CHORO_HostAddress = http://localhost:5039
+
+GET {{WB_CHORO_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
