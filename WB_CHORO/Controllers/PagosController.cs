@@ -29,11 +29,42 @@ namespace WB_CHORO.Controllers
 
             try
             {
-                //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
+                    //Codigo para sacar funcion de proceso en el procedimiento almacenado
+                    string proceso;
 
+                    using (var getProcesoCommand = new SqlCommand(
+                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
+                    {
+                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            proceso = result.ToString();
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró un valor para NUMERACION_DE_RECIBO en PUNTO_DE_VENTA.");
+                        }
+                    }
+
+                    //Codigo que toma el ultimo numero de partida segun el proceso y le suma 1
+                    int numPartida = 1;
+                       using (var command = new SqlCommand(
+                       "DECLARE @Proceso NVARCHAR(6); " +
+                       "SELECT @Proceso = NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011'; " +
+                       "SELECT ISNULL(MAX(NUMERO_DE_PARTIDA), 0) + 1 " +
+                       "FROM TRN_CLIENTE_DIARIO_MOV WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
+                        {
+                               var result = await command.ExecuteScalarAsync();
+                               if (result != null)
+                               {
+                                      numPartida = Convert.ToInt32(result);
+                               }
+                        }
+
+                    //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                     string codigoBic = null;
                     using (var command = new SqlCommand(
                         "SELECT CLIENTE_TABLA.CODIGO_BIC " +
@@ -50,7 +81,6 @@ namespace WB_CHORO.Controllers
                                 codigoBic = reader["CODIGO_BIC"].ToString();
                             }
                         }
-                        connection.Close(); 
                     }
 
                     if (codigoBic == null)
@@ -59,83 +89,18 @@ namespace WB_CHORO.Controllers
                     }
 
 
-                        /*
-                        string codigoBic1 = "PV0011";
-                    string numRecibos = null;
-                    using (var command = new SqlCommand("select NUMERACION_DE_RECIBOS" +
-                        "from PUNTO_DE_VISTA" +
-                        "where CODIGO_BIC = @CodigoBic", connection))
-                    {
-                        connection.Open();
-                        command.Parameters.AddWithValue("@CodigoBic", codigoBic1);
-
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            if (await reader.ReadAsync())
-                            {
-                                numRecibos = reader["NUMERACION_DE_RECIBOS"].ToString();
-                            }
-                        }
-                        connection.Close();
-                    }
-
-                    if (numRecibos == null)
-                    {
-                        return NotFound($"No se encontro el Proceso: {codigoBic1}");
-                    }
-
-                    using (var command = new SqlCommand(
-                        "UPDATE TRN_CLIENTE_DIARIO_MOV" +
-                        "SET PREFIJO_PARTIDA_CONTABLE = @numRecibos" +
-                        "WHERE CODIGO_BIC = @CodigoBic", connection))
-                    {
-                        connection.Open();
-                        command.Parameters.AddWithValue("@numRecibos", numRecibos);
-                        command.Parameters.AddWithValue("@CodigoBic", codigoBic1);
-
-                        int rowsAffected = await command.ExecuteNonQueryAsync();
-                        connection.Close();
-
-                        if (rowsAffected == 0)
-                        {
-                            return NotFound($"No se encontro el Proceso :{codigoBic1}");
-                        }
-                    }
-
-                        //  
-                        */
-
-                        //Codigo para tomar el ultimo NUMERO_DE_PARTIDA y le sume 1
-                        int numPartida = 1;
-                    using (var command = new SqlCommand(
-                        "SELECT ISNULL(MAX(NUMERO_DE_PARTIDA), 0) + 1 FROM TRN_CLIENTE_DIARIO_MOV WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso", connection))
-                    {
-                        connection.Open();
-                        command.Parameters.AddWithValue("@Proceso", request.Proceso);
-
-                        var result = await command.ExecuteScalarAsync();
-                        if (result != null)
-                        {
-                            numPartida = Convert.ToInt32(result);
-                        }
-                        connection.Close();
-                    }
-                      
-
-
                     //codigo para correr el procedimiento almacenado
                     using (var command = new SqlCommand("PROCESAR_PAGO", connection))
                     {
-                        connection.Open();
-
                         command.CommandType = CommandType.StoredProcedure;
 
-                        command.Parameters.AddWithValue("@Proceso", request.Proceso);
+                        command.Parameters.AddWithValue("@Proceso", proceso);
                         command.Parameters.AddWithValue("@NumPartida", numPartida);
-                        command.Parameters.AddWithValue("@CodigoBic", codigoBic);
+                        command.Parameters.AddWithValue("@Cliente_codigoBic", codigoBic);
 
                         await command.ExecuteNonQueryAsync();
                     }
+                    connection.Close();
                 }
 
                 return Ok("El pago se realizó correctamente!");
