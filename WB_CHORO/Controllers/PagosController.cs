@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
+using Microsoft.Xrm.Sdk;
 using System.Data;
 using System.Diagnostics;
 using WB_CHORO.Models;
@@ -45,7 +46,7 @@ namespace WB_CHORO.Controllers
                         }
                         else
                         {
-                            return NotFound("No se encontró un valor para NUMERACION_DE_RECIBO en PUNTO_DE_VENTA.");
+                            return NotFound("No se encontró el proceso.");
                         }
                     }
 
@@ -63,6 +64,8 @@ namespace WB_CHORO.Controllers
                                       numPartida = Convert.ToInt32(result);
                                }
                         }
+
+
 
                     //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                     string codigoBic = null;
@@ -88,7 +91,68 @@ namespace WB_CHORO.Controllers
                         return NotFound($"No se encontró el cliente: {request.Cliente}");
                     }
 
+                    //Codigo para sacar la forma de pago 
+                    string formaPago;
 
+                    using (var insertCommand = new SqlCommand(
+                        "SELECT CODIGO_FORMAS_PAGO FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
+                    {
+                        var result = await insertCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            formaPago = result.ToString();
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró la forma de pago.");
+                        }
+                    }
+
+                    //Insertado del Documento de Transaccion
+                    string documentoICP;
+                    using (var insertCommand = new SqlCommand(
+                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV (DOCUMENTO_TRANSACCION_ICP) VALUES (@DocumentoICP);", connection))
+                    {
+                        documentoICP = request.Documento;   
+                    }
+
+                    //para sacar el codigo de Moneda
+                    string moneda;
+
+                    using (var command = new SqlCommand(
+                        "SELECT MONEDA_ORIGEN_CODIGO_DE_M FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = 'CONSEF' AND NUMERO_DE_FACTURA_DE_SERV = 35;", connection))
+                    {
+                        var result = await command.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            moneda = result.ToString();
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró el codigo de moneda");
+                        }
+                    }
+                    /*
+                    //El pago que se realizara 
+                    decimal pago;
+
+                    using (var command = new SqlCommand(
+                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV(VALOR_TRANSACCION_ORIG2JT) VALUES (@Pago);", connection))
+                    {
+                        command.Parameters.AddWithValue("@Pago", request.Pago);
+                        using (var reader = await command.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                pago = Convert.ToInt32(reader);
+                            }
+                            else
+                            {
+                                return NotFound("No se realizo el pago");
+                            }
+                        }
+                    }
+                    */
                     //codigo para correr el procedimiento almacenado
                     using (var command = new SqlCommand("PROCESAR_PAGO", connection))
                     {
@@ -97,6 +161,10 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@Proceso", proceso);
                         command.Parameters.AddWithValue("@NumPartida", numPartida);
                         command.Parameters.AddWithValue("@Cliente_codigoBic", codigoBic);
+                        command.Parameters.AddWithValue("@Forma_Pago", formaPago);
+                        command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
+                        command.Parameters.AddWithValue("@Moneda", moneda);
+                       // command.Parameters.AddWithValue("@Pago", pago);
 
                         await command.ExecuteNonQueryAsync();
                     }
