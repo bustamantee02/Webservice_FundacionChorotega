@@ -33,6 +33,7 @@ namespace WB_CHORO.Controllers
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
+
                     //Codigo para sacar funcion de proceso en el procedimiento almacenado
                     string proceso;
 
@@ -132,27 +133,44 @@ namespace WB_CHORO.Controllers
                             return NotFound("No se encontró el codigo de moneda");
                         }
                     }
-                    /*
-                    //El pago que se realizara 
-                    decimal pago;
+
+                    //Fecha de factura
+                    DateTime dateTime;
 
                     using (var command = new SqlCommand(
-                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV(VALOR_TRANSACCION_ORIG2JT) VALUES (@Pago);", connection))
+                        "SELECT FECHA_FACTURA_SERVICIO FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = 'CONSEF' AND NUMERO_DE_FACTURA_DE_SERV = 35;", connection))
                     {
-                        command.Parameters.AddWithValue("@Pago", request.Pago);
-                        using (var reader = await command.ExecuteReaderAsync())
+                        var result = await command.ExecuteScalarAsync();
+                        if (result != null)
                         {
-                            if (await reader.ReadAsync())
-                            {
-                                pago = Convert.ToInt32(reader);
-                            }
-                            else
-                            {
-                                return NotFound("No se realizo el pago");
-                            }
+                            dateTime = Convert.ToDateTime(result.ToString());
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró la fecha");
                         }
                     }
-                    */
+
+                    //
+
+
+                    //Definicion del proceso 
+                    string defProceso;
+
+                    using (var getProcesoCommand = new SqlCommand(
+                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
+                    {
+                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            defProceso = result.ToString();
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró el proceso.");
+                        }
+                    }
+
                     //codigo para correr el procedimiento almacenado
                     using (var command = new SqlCommand("PROCESAR_PAGO", connection))
                     {
@@ -164,7 +182,9 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@Forma_Pago", formaPago);
                         command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
                         command.Parameters.AddWithValue("@Moneda", moneda);
-                       // command.Parameters.AddWithValue("@Pago", pago);
+                        command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
+                        command.Parameters.AddWithValue("@Fecha", dateTime);
+                        command.Parameters.AddWithValue("@defProceso", defProceso);
 
                         await command.ExecuteNonQueryAsync();
                     }

@@ -9,6 +9,6 @@ namespace WB_CHORO.Models
         public string Cliente { get; set; }
         public string  Documento { get; set; }
 
-        //public decimal Pago { get; set; }
+        public decimal ValorPago { get; set; }
     }
 }
