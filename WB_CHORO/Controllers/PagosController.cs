@@ -151,9 +151,6 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
-                    //
-
-
                     //Definicion del proceso 
                     string defProceso;
 
@@ -164,6 +161,40 @@ namespace WB_CHORO.Controllers
                         if (result != null)
                         {
                             defProceso = result.ToString();
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró el proceso.");
+                        }
+                    }
+
+                    //YEAR del periodo contable 
+                    int year;
+
+                    using (var getProcesoCommand = new SqlCommand(
+                        "SELECT ANO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE ANO_DEL_PERIODO = 2024;", connection))
+                    {
+                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            year = Convert.ToInt32(result);
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró el proceso.");
+                        }
+                    }
+
+                    //Numero del periodo contable 
+                    string numPeriodo;
+
+                    using (var getProcesoCommand = new SqlCommand(
+                        "SELECT NUMERO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE NUMERO_DEL_PERIODO = '11';", connection))
+                    {
+                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            numPeriodo = result.ToString();
                         }
                         else
                         {
@@ -185,6 +216,8 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
                         command.Parameters.AddWithValue("@Fecha", dateTime);
                         command.Parameters.AddWithValue("@defProceso", defProceso);
+                        command.Parameters.AddWithValue("@Year", year);
+                        command.Parameters.AddWithValue("@numPeriodo", numPeriodo);
 
                         await command.ExecuteNonQueryAsync();
                     }
