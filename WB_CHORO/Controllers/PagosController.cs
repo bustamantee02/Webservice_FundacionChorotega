@@ -34,12 +34,20 @@ namespace WB_CHORO.Controllers
                 {
                     connection.Open();
 
+                    //Datos Dinammicos
+                    string PuntoVenta = "PV0011";
+                    string prefDocumento = "CONSEF";
+                    int numDocumento = 35;
+                    int yearPeriodo = 2024;
+                    string mesPeriodo = "11";
+
                     //Codigo para sacar funcion de proceso en el procedimiento almacenado
                     string proceso;
 
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
+                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
                     {
+                        getProcesoCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -55,11 +63,13 @@ namespace WB_CHORO.Controllers
                     int numPartida = 1;
                        using (var command = new SqlCommand(
                        "DECLARE @Proceso NVARCHAR(6); " +
-                       "SELECT @Proceso = NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011'; " +
+                       "SELECT @Proceso = NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta; " +
                        "SELECT ISNULL(MAX(NUMERO_DE_PARTIDA), 0) + 1 " +
                        "FROM TRN_CLIENTE_DIARIO_MOV WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
                         {
-                               var result = await command.ExecuteScalarAsync();
+
+                        command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
+                        var result = await command.ExecuteScalarAsync();
                                if (result != null)
                                {
                                       numPartida = Convert.ToInt32(result);
@@ -96,8 +106,9 @@ namespace WB_CHORO.Controllers
                     string formaPago;
 
                     using (var insertCommand = new SqlCommand(
-                        "SELECT CODIGO_FORMAS_PAGO FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
-                    {
+                        "SELECT CODIGO_FORMAS_PAGO FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
+                    {   
+                        insertCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await insertCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -121,8 +132,11 @@ namespace WB_CHORO.Controllers
                     string moneda;
 
                     using (var command = new SqlCommand(
-                        "SELECT MONEDA_ORIGEN_CODIGO_DE_M FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = 'CONSEF' AND NUMERO_DE_FACTURA_DE_SERV = 35;", connection))
+                        "SELECT MONEDA_ORIGEN_CODIGO_DE_M FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = @prefDocumento AND NUMERO_DE_FACTURA_DE_SERV = @numDocumento;", connection))
                     {
+                        command.Parameters.AddWithValue("@prefDocumento", prefDocumento);
+                        command.Parameters.AddWithValue("@numDocumento", numDocumento);
+
                         var result = await command.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -138,8 +152,11 @@ namespace WB_CHORO.Controllers
                     DateTime dateTime;
 
                     using (var command = new SqlCommand(
-                        "SELECT FECHA_FACTURA_SERVICIO FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = 'CONSEF' AND NUMERO_DE_FACTURA_DE_SERV = 35;", connection))
+                        "SELECT FECHA_FACTURA_SERVICIO FROM FACTURAS_SERVICIOS_CONTROL WHERE PREFIJO_PARTIDA_CONTABLE = @prefDocumento AND NUMERO_DE_FACTURA_DE_SERV = @numDocumento;", connection))
                     {
+                        command.Parameters.AddWithValue("@prefDocumento", prefDocumento);
+                        command.Parameters.AddWithValue("@numDocumento", numDocumento);
+
                         var result = await command.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -155,8 +172,9 @@ namespace WB_CHORO.Controllers
                     string defProceso;
 
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = 'PV0011';", connection))
+                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
                     {
+                        getProcesoCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -172,8 +190,9 @@ namespace WB_CHORO.Controllers
                     int year;
 
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT ANO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE ANO_DEL_PERIODO = 2024;", connection))
+                        "SELECT ANO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE ANO_DEL_PERIODO = @yearPeriodo;", connection))
                     {
+                        getProcesoCommand.Parameters.AddWithValue("@yearPeriodo", yearPeriodo);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -189,8 +208,9 @@ namespace WB_CHORO.Controllers
                     string numPeriodo;
 
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE NUMERO_DEL_PERIODO = '11';", connection))
+                        "SELECT NUMERO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE NUMERO_DEL_PERIODO = @mesPeriodo;", connection))
                     {
+                        getProcesoCommand.Parameters.AddWithValue("@mesPeriodo", mesPeriodo);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
@@ -214,6 +234,7 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
                         command.Parameters.AddWithValue("@Moneda", moneda);
                         command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
+                        command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         command.Parameters.AddWithValue("@Fecha", dateTime);
                         command.Parameters.AddWithValue("@defProceso", defProceso);
                         command.Parameters.AddWithValue("@Year", year);
