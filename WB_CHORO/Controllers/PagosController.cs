@@ -38,8 +38,6 @@ namespace WB_CHORO.Controllers
                     string PuntoVenta = "PV0011";
                     string prefDocumento = "CONSEF";
                     int numDocumento = 35;
-                    int yearPeriodo = 2024;
-                    string mesPeriodo = "11";
 
                     //Codigo para sacar funcion de proceso en el procedimiento almacenado
                     string proceso;
@@ -64,8 +62,8 @@ namespace WB_CHORO.Controllers
                        using (var command = new SqlCommand(
                        "DECLARE @Proceso NVARCHAR(6); " +
                        "SELECT @Proceso = NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta; " +
-                       "SELECT ISNULL(MAX(NUMERO_DE_PARTIDA), 0) + 1 " +
-                       "FROM TRN_CLIENTE_DIARIO_MOV WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
+                       "SELECT ISNULL(MAX(NUMERO_ULTIMA_PARTIDA_CON), 0) + 1 " +
+                       "FROM NUMERACION_PARTIDAS WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
                         {
 
                         command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
@@ -147,6 +145,24 @@ namespace WB_CHORO.Controllers
                             return NotFound("No se encontró el codigo de moneda");
                         }
                     }
+                    //Valor de cambio 
+                    int valCambio;
+
+                    using (var getValorCommand = new SqlCommand(
+                        "SELECT TOP 1 VALOR_TASA_DE_CAMBIO FROM TASAS_DE_CAMBIO WHERE FECHA_DE_VIGENCIA_TASA_CA<=@FechaActual ORDER BY FECHA_DE_VIGENCIA_TASA_CA DESC;", connection))
+                    {
+                        getValorCommand.Parameters.AddWithValue("@FechaActual", DateTime.Now);
+                        var result = await getValorCommand.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            valCambio = Convert.ToInt32(result);
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró el valor de cambio.");
+                        }
+                    }
+
 
                     //Fecha de factura
                     DateTime dateTime;
@@ -189,36 +205,38 @@ namespace WB_CHORO.Controllers
                     //YEAR del periodo contable 
                     int year;
 
-                    using (var getProcesoCommand = new SqlCommand(
-                        "SELECT ANO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE ANO_DEL_PERIODO = @yearPeriodo;", connection))
+                    using (var getYearCommand = new SqlCommand(
+                        "SELECT ANO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE @FechaActual >= FECHA_DE_INICIO_DEL_PERIO "
+                        + " AND @FechaActual < DATEADD(DAY, 1, FECHA_FIN_DEL_PERIODO); ", connection))
                     {
-                        getProcesoCommand.Parameters.AddWithValue("@yearPeriodo", yearPeriodo);
-                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        getYearCommand.Parameters.AddWithValue("@FechaActual", DateTime.Now);
+                        var result = await getYearCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
                             year = Convert.ToInt32(result);
                         }
                         else
                         {
-                            return NotFound("No se encontró el proceso.");
+                            return NotFound("No se encontró el year.");
                         }
                     }
 
-                    //Numero del periodo contable 
-                    string numPeriodo;
+                    //Mes del periodo contable 
+                    string mes;
 
-                    using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE NUMERO_DEL_PERIODO = @mesPeriodo;", connection))
+                    using (var getMesCommand = new SqlCommand(
+                        "SELECT NUMERO_DEL_PERIODO FROM PERIODO_CONTABLE WHERE @FechaActual >= FECHA_DE_INICIO_DEL_PERIO " +
+                        "AND @FechaActual < DATEADD(DAY, 1, FECHA_FIN_DEL_PERIODO);", connection))
                     {
-                        getProcesoCommand.Parameters.AddWithValue("@mesPeriodo", mesPeriodo);
-                        var result = await getProcesoCommand.ExecuteScalarAsync();
+                        getMesCommand.Parameters.AddWithValue("@FechaActual", DateTime.Now);
+                        var result = await getMesCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
-                            numPeriodo = result.ToString();
+                            mes = result.ToString();
                         }
                         else
                         {
-                            return NotFound("No se encontró el proceso.");
+                            return NotFound("No se encontró el mes.");
                         }
                     }
 
@@ -234,11 +252,12 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
                         command.Parameters.AddWithValue("@Moneda", moneda);
                         command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
+                        command.Parameters.AddWithValue("@valCambio", valCambio);
                         command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         command.Parameters.AddWithValue("@Fecha", dateTime);
                         command.Parameters.AddWithValue("@defProceso", defProceso);
                         command.Parameters.AddWithValue("@Year", year);
-                        command.Parameters.AddWithValue("@numPeriodo", numPeriodo);
+                        command.Parameters.AddWithValue("@numPeriodo", mes);
 
                         await command.ExecuteNonQueryAsync();
                     }
