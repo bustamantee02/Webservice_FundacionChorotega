@@ -2,10 +2,8 @@
 
 namespace WB_CHORO.Models
 {
-    public class Datos
+    public class DatosPagos
     {
-       // public string Proceso { get; set; }
-       // public int NumPartida { get; set; }
         public string Cliente { get; set; }
         public string  Documento { get; set; }
 

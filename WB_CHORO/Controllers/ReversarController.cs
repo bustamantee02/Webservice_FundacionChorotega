@@ -1,27 +1,24 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 using Microsoft.Xrm.Sdk;
 using System.Data;
-using System.Diagnostics;
+using System;
 using WB_CHORO.Models;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace WB_CHORO.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class PagosController : ControllerBase
+    public class ReversarController : ControllerBase
     {
         private readonly string _connectionString;
-
-        public PagosController(IConfiguration configuration)
+        public ReversarController(IConfiguration configuration)
         {
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        [HttpPost("procesar-pago")]
-        public async Task<IActionResult> ProcesarPago([FromBody] DatosPagos request)
+        [HttpPost("reversar-pago")]
+        public async Task<IActionResult> ReversarPago([FromBody] ReversarDatos request)
         {
             if (request == null)
             {
@@ -33,17 +30,15 @@ namespace WB_CHORO.Controllers
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
-
-                    //Datos Dinammicos
+                    //Datos Dinamicos 
                     string PuntoVenta = "PV0011";
                     string prefDocumento = "CONSEF";
                     int numDocumento = 35;
 
-                    //Codigo para sacar funcion de proceso en el procedimiento almacenado
+                    //Para mandar a llamar el proceso
                     string proceso;
-
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
+                        "SELECT NUMERACION_DE_REVERSION_DE_RECIBOS FROM PUNTO_DE_VENTA_DA WHERE CODIGO_BIC = @PuntoVenta;", connection))
                     {
                         getProcesoCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
@@ -57,35 +52,35 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
-                    //Codigo que toma el ultimo numero de partida segun el proceso y le suma 1
                     int numPartida = 1;
-                       using (var command = new SqlCommand(
-                       "DECLARE @Proceso NVARCHAR(6); " +
-                       "SELECT @Proceso = NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta; " +
-                       "SELECT ISNULL(MAX(NUMERO_ULTIMA_PARTIDA_CON), 0) + 1 " +
-                       "FROM NUMERACION_PARTIDAS WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
-                        {
+                    using (var command = new SqlCommand(
+                    "DECLARE @Proceso NVARCHAR(6); " +
+                    "SELECT @Proceso = NUMERACION_DE_REVERSION_DE_RECIBOS FROM PUNTO_DE_VENTA_DA WHERE CODIGO_BIC = @PuntoVenta; " +
+                    "SELECT ISNULL(MAX(NUMERO_ULTIMA_PARTIDA_CON), 0) + 1 " +
+                    "FROM NUMERACION_PARTIDAS WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso;", connection))
+                    {
 
                         command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await command.ExecuteScalarAsync();
-                               if (result != null)
-                               {
-                                      numPartida = Convert.ToInt32(result);
-                               }
+                        if (result != null)
+                        {
+                            numPartida = Convert.ToInt32(result);
                         }
+                    }
 
-                       //Actualizacion del numero en la tabla de NUMERACION_PARTIDAS 
+                    //Actualizacion de la tabla de NUMERACION_PARTIDAS
                     using (var updateCommand = new SqlCommand(
-                    "UPDATE NUMERACION_PARTIDAS " +
-                    "SET NUMERO_ULTIMA_PARTIDA_CON = @NumPartida " +
-                    "WHERE PREFIJO_PARTIDA_CONTABLE = (SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta);", connection))
+                   "UPDATE NUMERACION_PARTIDAS " +
+                   "SET NUMERO_ULTIMA_PARTIDA_CON = @NumPartida " +
+                   "WHERE PREFIJO_PARTIDA_CONTABLE = (SELECT NUMERACION_DE_REVERSION_DE_RECIBOS FROM PUNTO_DE_VENTA_DA WHERE CODIGO_BIC = @PuntoVenta);", connection))
                     {
                         updateCommand.Parameters.AddWithValue("@NumPartida", numPartida);
                         updateCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         await updateCommand.ExecuteNonQueryAsync();
                     }
 
-                    //Existencia del cliente
+
+                    //Validacion de la Existencia del cliente
                     string exisCliente;
                     using (var command = new SqlCommand(
                         "SELECT CLIENTE_TABLA.CODIGO_BIC " +
@@ -100,8 +95,7 @@ namespace WB_CHORO.Controllers
                             return NotFound("No existe el cliente en las dos tablas");
                         }
                     }
-
-                    //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
+                    //Insert del cliente ya con la validacion 
                     string codigoBic = null;
                     using (var command = new SqlCommand(
                         "SELECT CLIENTE_TABLA.CODIGO_BIC " +
@@ -130,7 +124,7 @@ namespace WB_CHORO.Controllers
 
                     using (var insertCommand = new SqlCommand(
                         "SELECT CODIGO_FORMAS_PAGO FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
-                    {   
+                    {
                         insertCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await insertCommand.ExecuteScalarAsync();
                         if (result != null)
@@ -148,10 +142,10 @@ namespace WB_CHORO.Controllers
                     using (var insertCommand = new SqlCommand(
                         "INSERT INTO TRN_CLIENTE_DIARIO_MOV (DOCUMENTO_TRANSACCION_ICP) VALUES (@DocumentoICP);", connection))
                     {
-                        documentoICP = request.Documento;   
+                        documentoICP = request.Documento;
                     }
 
-                    //para sacar el codigo de Moneda
+                    //Codigo para sacar la forma de pago 
                     string moneda;
 
                     using (var command = new SqlCommand(
@@ -189,7 +183,6 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
-
                     //Fecha de factura
                     DateTime dateTime;
 
@@ -214,7 +207,7 @@ namespace WB_CHORO.Controllers
                     string defProceso;
 
                     using (var getProcesoCommand = new SqlCommand(
-                        "SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta;", connection))
+                        "SELECT NUMERACION_DE_REVERSION_DE_RECIBOS FROM PUNTO_DE_VENTA_DA WHERE CODIGO_BIC = @PuntoVenta;", connection))
                     {
                         getProcesoCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         var result = await getProcesoCommand.ExecuteScalarAsync();
@@ -267,20 +260,20 @@ namespace WB_CHORO.Controllers
                     }
 
                     //codigo para correr el procedimiento almacenado
-                    using (var command = new SqlCommand("PROCESAR_PAGO", connection))
+                    using (var command = new SqlCommand("REVERSAR_PAGO", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
 
                         command.Parameters.AddWithValue("@Proceso", proceso);
                         command.Parameters.AddWithValue("@NumPartida", numPartida);
-                        command.Parameters.AddWithValue("@Cliente_codigoBic", codigoBic);
-                        command.Parameters.AddWithValue("@Forma_Pago", formaPago);
+                        command.Parameters.AddWithValue("@Cliente", codigoBic);
+                        command.Parameters.AddWithValue("@FormaPago", formaPago);
                         command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
                         command.Parameters.AddWithValue("@Moneda", moneda);
-                        command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
+                        //command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
                         command.Parameters.AddWithValue("@valCambio", valCambio);
-                        command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         command.Parameters.AddWithValue("@Fecha", dateTime);
+                        command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         command.Parameters.AddWithValue("@defProceso", defProceso);
                         command.Parameters.AddWithValue("@Year", year);
                         command.Parameters.AddWithValue("@numPeriodo", mes);
@@ -289,15 +282,12 @@ namespace WB_CHORO.Controllers
                     }
                     connection.Close();
                 }
-
-                return Ok("El pago se realizó correctamente!");
+                return Ok("La reversion se realizó correctamente!");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Pago fallido.: {ex.Message}");
-                
+                return StatusCode(500, $"Reversion fallida.:{ex.Message}");
             }
         }
     }
 }
-
