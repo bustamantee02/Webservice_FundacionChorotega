@@ -26,15 +26,16 @@ namespace WB_CHORO.Controllers
                 using (var connection = new SqlConnection(_connectionString))
                 {
                     connection.Open();
-                    
+               
+                    //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                     string codigoBic = null;
                     using (var command = new SqlCommand(
                         "SELECT CLIENTE_TABLA.CODIGO_BIC " +
                         "FROM BASE_INFO_CENTRAL " +
                         "INNER JOIN CLIENTE_TABLA ON BASE_INFO_CENTRAL.CODIGO_BIC = CLIENTE_TABLA.CODIGO_BIC " +
-                        "WHERE BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI = @Cliente", connection))
+                        "WHERE REPLACE(BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI, '-', '') = REPLACE(@Cliente, '-', '')", connection))
                     {
-                        command.Parameters.AddWithValue("@Cliente", Cliente.Replace("-", ""));
+                        command.Parameters.AddWithValue("@Cliente",Cliente);
 
                         using (var reader = await command.ExecuteReaderAsync())
                         {
@@ -49,15 +50,12 @@ namespace WB_CHORO.Controllers
                     {
                         return NotFound($"No se encontró el cliente: {Cliente}");
                     }
-
-                    //Tomar el year
-
                     
                     //Correr el procedimiento almacenado
                     using (var command = new SqlCommand("CONSULTAR_PAGO", connection))
                     {
                         command.CommandType = CommandType.StoredProcedure;
-                        command.Parameters.AddWithValue("@Cliente", Cliente.Replace("-", ""));
+                        command.Parameters.AddWithValue("@Cliente", codigoBic);
                         command.Parameters.AddWithValue("@Documento", Documento);
 
                         using (var reader = await command.ExecuteReaderAsync())

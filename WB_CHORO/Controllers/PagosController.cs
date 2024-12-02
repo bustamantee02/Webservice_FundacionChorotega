@@ -74,7 +74,32 @@ namespace WB_CHORO.Controllers
                                }
                         }
 
+                       //Actualizacion del numero en la tabla de NUMERACION_PARTIDAS 
+                    using (var updateCommand = new SqlCommand(
+                    "UPDATE NUMERACION_PARTIDAS " +
+                    "SET NUMERO_ULTIMA_PARTIDA_CON = @NumPartida " +
+                    "WHERE PREFIJO_PARTIDA_CONTABLE = (SELECT NUMERACION_DE_RECIBOS FROM PUNTO_DE_VENTA WHERE CODIGO_BIC = @PuntoVenta);", connection))
+                    {
+                        updateCommand.Parameters.AddWithValue("@NumPartida", numPartida);
+                        updateCommand.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
+                        await updateCommand.ExecuteNonQueryAsync();
+                    }
 
+                    //Existencia del cliente
+                    string exisCliente;
+                    using (var command = new SqlCommand(
+                        "SELECT CLIENTE_TABLA.CODIGO_BIC " +
+                        "FROM BASE_INFO_CENTRAL INNER JOIN CLIENTE_TABLA ON " +
+                        "BASE_INFO_CENTRAL.CODIGO_BIC = CLIENTE_TABLA.CODIGO_BIC" +
+                        "WHERE (BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI = @Cliente);", connection))
+                    {
+                        exisCliente = request.Cliente;
+
+                        if (exisCliente == null)
+                        {
+                            return NotFound("No existe el cliente en las dos tablas");
+                        }
+                    }
 
                     //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                     string codigoBic = null;
@@ -82,7 +107,7 @@ namespace WB_CHORO.Controllers
                         "SELECT CLIENTE_TABLA.CODIGO_BIC " +
                         "FROM BASE_INFO_CENTRAL " +
                         "INNER JOIN CLIENTE_TABLA ON BASE_INFO_CENTRAL.CODIGO_BIC = CLIENTE_TABLA.CODIGO_BIC " +
-                        "WHERE BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI = @Cliente", connection))
+                        "WHERE REPLACE(BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI, '-', '') = REPLACE(@Cliente, '-', '')", connection))
                     {
                         command.Parameters.AddWithValue("@Cliente", request.Cliente);
 
