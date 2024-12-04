@@ -1,9 +1,10 @@
 ﻿namespace WB_CHORO.Models
 {
-    public class ReversarDatos
+    public class DatosReversar
     {
         public string Cliente { get; set; }
 
         public string Documento { get; set; }
+        public string Usuario { get; set; }
     }
 }

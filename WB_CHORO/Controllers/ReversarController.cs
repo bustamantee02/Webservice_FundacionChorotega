@@ -4,6 +4,7 @@ using Microsoft.Xrm.Sdk;
 using System.Data;
 using System;
 using WB_CHORO.Models;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace WB_CHORO.Controllers
 {
@@ -18,7 +19,7 @@ namespace WB_CHORO.Controllers
         }
 
         [HttpPost("reversar-pago")]
-        public async Task<IActionResult> ReversarPago([FromBody] ReversarDatos request)
+        public async Task<IActionResult> ReversarPago([FromBody] DatosReversar request)
         {
             if (request == null)
             {
@@ -165,6 +166,23 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
+                    //Tomar el valor de la cuota
+                    int cuota;
+                    using (var command = new SqlCommand(
+                        "SELECT VALOR_CUOTA FROM CONTRATO_SERVICIOS_CONTROL WHERE CLIENTE_CODIGO_BIC = @Cliente;", connection))
+                    {
+                        command.Parameters.AddWithValue("@Cliente", codigoBic);
+                        var result = await command.ExecuteScalarAsync();
+                        if (result != null)
+                        {
+                            cuota = Convert.ToInt32(result);
+                        }
+                        else
+                        {
+                            return NotFound("No se encontró una cuota.");
+                        }
+                    }
+
                     //Valor de cambio 
                     int valCambio;
 
@@ -217,7 +235,7 @@ namespace WB_CHORO.Controllers
                         }
                         else
                         {
-                            return NotFound("No se encontró el proceso.");
+                            return NotFound("No se encontró uan definicion del proceso.");
                         }
                     }
 
@@ -259,6 +277,14 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
+                    //Usuario 
+                    string usuario;
+                    using (var insertCommand = new SqlCommand(
+                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV (USUARIO_ADICION) VALUES (@Usuario);", connection))
+                    {
+                        usuario = request.Usuario;
+                    }
+
                     //codigo para correr el procedimiento almacenado
                     using (var command = new SqlCommand("REVERSAR_PAGO", connection))
                     {
@@ -270,13 +296,14 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@FormaPago", formaPago);
                         command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
                         command.Parameters.AddWithValue("@Moneda", moneda);
-                        //command.Parameters.AddWithValue("@ValorPago", request.ValorPago);
+                        command.Parameters.AddWithValue("@Cuota", cuota);
                         command.Parameters.AddWithValue("@valCambio", valCambio);
                         command.Parameters.AddWithValue("@Fecha", dateTime);
                         command.Parameters.AddWithValue("@PuntoVenta", PuntoVenta);
                         command.Parameters.AddWithValue("@defProceso", defProceso);
                         command.Parameters.AddWithValue("@Year", year);
                         command.Parameters.AddWithValue("@numPeriodo", mes);
+                        command.Parameters.AddWithValue("@Usuario", usuario);
 
                         await command.ExecuteNonQueryAsync();
                     }

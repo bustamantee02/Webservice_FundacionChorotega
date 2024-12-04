@@ -265,6 +265,13 @@ namespace WB_CHORO.Controllers
                             return NotFound("No se encontró el mes.");
                         }
                     }
+                    //Usuario 
+                    string usuario;
+                    using (var insertCommand = new SqlCommand(
+                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV (USUARIO_ADICION) VALUES (@Usuario);", connection))
+                    {
+                        usuario = request.Usuario;
+                    }
 
                     //codigo para correr el procedimiento almacenado
                     using (var command = new SqlCommand("PROCESAR_PAGO", connection))
@@ -284,6 +291,7 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@defProceso", defProceso);
                         command.Parameters.AddWithValue("@Year", year);
                         command.Parameters.AddWithValue("@numPeriodo", mes);
+                        command.Parameters.AddWithValue("@Usuario", usuario);
 
                         await command.ExecuteNonQueryAsync();
                     }

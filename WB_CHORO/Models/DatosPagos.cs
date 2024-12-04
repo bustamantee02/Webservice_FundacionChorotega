@@ -8,5 +8,7 @@ namespace WB_CHORO.Models
         public string  Documento { get; set; }
 
         public decimal ValorPago { get; set; }
+
+        public string Usuario { get; set; }
     }
 }
