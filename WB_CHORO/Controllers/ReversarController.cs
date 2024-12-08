@@ -33,8 +33,6 @@ namespace WB_CHORO.Controllers
                     connection.Open();
                     //Datos Dinamicos 
                     string PuntoVenta = "PV0011";
-                    string prefDocumento = "CONSEF";
-                    int numDocumento = 35;
 
                     //Para mandar a llamar el proceso
                     string proceso;
@@ -138,13 +136,31 @@ namespace WB_CHORO.Controllers
                         }
                     }
 
-                    //Insertado del Documento de Transaccion
-                    string documentoICP;
-                    using (var insertCommand = new SqlCommand(
-                        "INSERT INTO TRN_CLIENTE_DIARIO_MOV (DOCUMENTO_TRANSACCION_ICP) VALUES (@DocumentoICP);", connection))
+                    // Dividir el valor de DocumentoICP en dos partes
+                    string prefDocumento = null;
+                    int numDocumento = 0;
+
+                    if (!string.IsNullOrEmpty(request.Documento))
                     {
-                        documentoICP = request.Documento;
+                        var partes = request.Documento.Split('-');
+                        if (partes.Length == 2)
+                        {
+                            prefDocumento = partes[0];
+                            if (!int.TryParse(partes[1], out numDocumento))
+                            {
+                                return BadRequest("El formato de Documento no es valido.");
+                            }
+                        }
+                        else
+                        {
+                            return BadRequest("El Documento no existe.");
+                        }
                     }
+                    else
+                    {
+                        return BadRequest("El Documento no puede estar vacío.");
+                    }
+
 
                     //Codigo para sacar la forma de pago 
                     string moneda;
@@ -168,9 +184,14 @@ namespace WB_CHORO.Controllers
 
                     //Tomar el valor de la cuota
                     int cuota;
+                    string procesoPago = "RECCON";
                     using (var command = new SqlCommand(
-                        "SELECT VALOR_CUOTA FROM CONTRATO_SERVICIOS_CONTROL WHERE CLIENTE_CODIGO_BIC = @Cliente;", connection))
+                        "SELECT TOP 1 VALOR_TRANSACCION_ORIG2JT FROM TRN_CLIENTE_DIARIO_MOV WHERE PREFIJO_PARTIDA_CONTABLE = @Proceso2 " +
+                        "AND CLIENTE_CODIGO_BIC = @Cliente AND DOCUMENTO_TRANSACCION_ICP = @DocumentoICP " +
+                        "ORDER BY FECHA_DE_TRANSACCION DESC;", connection))
                     {
+                        command.Parameters.AddWithValue("@Proceso2", procesoPago);
+                        command.Parameters.AddWithValue("@DocumentoICP", request.Documento);
                         command.Parameters.AddWithValue("@Cliente", codigoBic);
                         var result = await command.ExecuteScalarAsync();
                         if (result != null)
@@ -184,7 +205,7 @@ namespace WB_CHORO.Controllers
                     }
 
                     //Valor de cambio 
-                    int valCambio;
+                    decimal valCambio;
 
                     using (var getValorCommand = new SqlCommand(
                         "SELECT TOP 1 VALOR_TASA_DE_CAMBIO FROM TASAS_DE_CAMBIO WHERE FECHA_DE_VIGENCIA_TASA_CA<=@FechaActual ORDER BY FECHA_DE_VIGENCIA_TASA_CA DESC;", connection))
@@ -193,7 +214,7 @@ namespace WB_CHORO.Controllers
                         var result = await getValorCommand.ExecuteScalarAsync();
                         if (result != null)
                         {
-                            valCambio = Convert.ToInt32(result);
+                            valCambio = Convert.ToDecimal(result);
                         }
                         else
                         {
@@ -294,7 +315,7 @@ namespace WB_CHORO.Controllers
                         command.Parameters.AddWithValue("@NumPartida", numPartida);
                         command.Parameters.AddWithValue("@Cliente", codigoBic);
                         command.Parameters.AddWithValue("@FormaPago", formaPago);
-                        command.Parameters.AddWithValue("@DocumentoICP", documentoICP);
+                        command.Parameters.AddWithValue("@DocumentoICP", request.Documento);
                         command.Parameters.AddWithValue("@Moneda", moneda);
                         command.Parameters.AddWithValue("@Cuota", cuota);
                         command.Parameters.AddWithValue("@valCambio", valCambio);

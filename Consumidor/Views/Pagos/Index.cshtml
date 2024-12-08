@@ -1,0 +1,39 @@
+﻿@model Consumidor.Models.DatosPagos
+
+<h2>Procesar Pago</h2>
+
+<form asp-action="ProcesarPago" method="post">
+    <div>
+        <label for="Cliente">Cliente</label>
+        <input asp-for="Cliente" class="form-control" />
+        <span asp-validation-for="Cliente" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label for="Documento">Documento</label>
+        <input asp-for="Documento" class="form-control" />
+        <span asp-validation-for="Documento" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label for="ValorPago">Valor del Pago</label>
+        <input asp-for="ValorPago" class="form-control" type="number" step="0.01" />
+        <span asp-validation-for="ValorPago" class="text-danger"></span>
+    </div>
+
+    <div>
+        <label for="Usuario">Usuario</label>
+        <input asp-for="Usuario" class="form-control" />
+        <span asp-validation-for="Usuario" class="text-danger"></span>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Procesar Pago</button>
+</form>
+
+@if (ViewBag.Mensaje != null)
+{
+    <div class="alert alert-info">
+        @ViewBag.Mensaje
+    </div>
+}
+

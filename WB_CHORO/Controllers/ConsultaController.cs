@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using WB_CHORO.Models;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace WB_CHORO.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     public class ConsultaController:ControllerBase
     {
         private readonly string _connectionString;
@@ -15,8 +18,8 @@ namespace WB_CHORO.Controllers
             _connectionString = configuration.GetConnectionString("DefaultConnection");
         }
 
-        [HttpGet("consulta-pago")]
-        public async Task<IActionResult> ConsultarSaldo(string Cliente, string Documento)
+        [HttpGet("consultar-pago")]
+        public async Task<IActionResult> ProcesarConsulta(string Cliente, string Documento)
         {
             var resultado = new List<DatosConsulta>();
 
@@ -29,8 +32,12 @@ namespace WB_CHORO.Controllers
                
                     //Codigo para busqueda de CODIGO_BIC por la identidad del usuario
                     string codigoBic = null;
+                    string nombreBic = null;
+                    string apellidoBic = null;
                     using (var command = new SqlCommand(
-                        "SELECT CLIENTE_TABLA.CODIGO_BIC " +
+                        "SELECT RTRIM(CLIENTE_TABLA.CODIGO_BIC) AS CODIGO_BIC, " +
+                        "RTRIM(BASE_INFO_CENTRAL.NOMBRE_BIC) AS NOMBRE_BIC, " +
+                        "RTRIM(BASE_INFO_CENTRAL.APELLIDO_BIC) AS APELLIDO_BIC " +
                         "FROM BASE_INFO_CENTRAL " +
                         "INNER JOIN CLIENTE_TABLA ON BASE_INFO_CENTRAL.CODIGO_BIC = CLIENTE_TABLA.CODIGO_BIC " +
                         "WHERE REPLACE(BASE_INFO_CENTRAL.DOCUMENTO_DE_IDENTIFICACI, '-', '') = REPLACE(@Cliente, '-', '')", connection))
@@ -42,13 +49,10 @@ namespace WB_CHORO.Controllers
                             if (await reader.ReadAsync())
                             {
                                 codigoBic = reader["CODIGO_BIC"].ToString();
+                                nombreBic = reader["NOMBRE_BIC"].ToString();
+                                apellidoBic = reader["APELLIDO_BIC"].ToString();
                             }
                         }
-                    }
-
-                    if (codigoBic == null)
-                    {
-                        return NotFound($"No se encontró el cliente: {Cliente}");
                     }
                     
                     //Correr el procedimiento almacenado
@@ -66,7 +70,11 @@ namespace WB_CHORO.Controllers
                                 {
                                     Cliente = reader.GetString(reader.GetOrdinal("CLIENTE_CODIGO_BIC")),
                                     Documento = reader.GetString(reader.GetOrdinal("Documento")),
-                                    Cuota = reader.GetDecimal(reader.GetOrdinal("CUOTA_DEL_CONTRATO"))
+                                    Cuota = reader.GetDecimal(reader.GetOrdinal("CUOTA_DEL_CONTRATO")),
+                                    Nombre = nombreBic,
+                                    Apellido = apellidoBic,
+                                    fechaInicio = reader.GetDateTime(reader.GetOrdinal("FECHA_DE_INICIO_DEL_CONTR")),
+                                    negocio = reader.GetInt32(reader.GetOrdinal("NEGOCIO"))
                                 });
                             }
                         }
